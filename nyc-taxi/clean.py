@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 import polars as pl
 
@@ -38,3 +39,20 @@ odrzucone = przed - po
 print(f"Przed czyszczeniem: {przed:>10,}")
 print(f"Po czyszczeniu:     {po:>10,}")
 print(f"Odrzucono:          {odrzucone:>10,} ({odrzucone / przed * 100:.2f}%)")
+
+czyste = czyste.with_columns(
+    pl.col("tpep_pickup_datetime").dt.hour().alias("pickup_hour"),
+    pl.col("tpep_pickup_datetime").dt.weekday().alias("pickup_day_of_week"),
+    (pl.col("tpep_pickup_datetime").dt.weekday() >= 6).alias("is_weekend"),
+    (pl.col("trip_distance") / (pl.col("trip_duration_minutes") / 60)).alias("avg_speed_mph"),
+)
+
+print(czyste.select("tpep_pickup_datetime", "pickup_hour", "pickup_day_of_week", "is_weekend", "avg_speed_mph").head())
+
+Path("data/lakehouse/flat").mkdir(parents=True, exist_ok=True)
+
+czyste.write_parquet("data/lakehouse/flat/trips.parquet", compression="snappy")
+
+czyste.write_parquet("data/lakehouse/partitioned", partition_by="VendorID", compression="snappy")
+
+print("Zapisano wariant A (płaski) i B (partycje)")
